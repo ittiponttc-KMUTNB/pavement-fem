@@ -404,21 +404,22 @@ def apply_load(nodes, n_dof, width, load_width=0.30, pressure=0.7):
     F = np.zeros(n_dof)
 
     x_center = width / 2.0
-    x_left   = x_center - load_width / 2.0
-    x_right  = x_center + load_width / 2.0
+    y_tol    = 1e-8
 
-    # tolerance สำหรับหา surface nodes (ขึ้นกับขนาด mesh)
-    y_tol = 1e-8
+    # หา surface nodes ทั้งหมดและ node spacing
+    all_surf = sorted([i for i, nd in enumerate(nodes) if abs(nd[1]) < y_tol],
+                      key=lambda i: nodes[i, 0])
+    dx = (nodes[all_surf[1], 0] - nodes[all_surf[0], 0]) if len(all_surf) >= 2 else 0.0
 
-    # หา node ที่อยู่บนผิว (y ≈ 0) และอยู่ใต้โหลด
-    # ใช้ tolerance เล็กน้อยที่ขอบ load zone
-    surface_nodes = []
-    for i, node in enumerate(nodes):
-        x, y = node
-        if abs(y) < y_tol and (x_left - 1e-10) <= x <= (x_right + 1e-10):
-            surface_nodes.append(i)
+    # ขยาย load zone ให้ครอบคลุม node spacing เพื่อให้ได้ >= 2 nodes เสมอ
+    actual_load_width = max(load_width, 2.0 * dx + 1e-10)
+    x_left  = x_center - actual_load_width / 2.0
+    x_right = x_center + actual_load_width / 2.0
 
-    surface_nodes.sort(key=lambda i: nodes[i, 0])
+    # หา surface nodes ที่อยู่ใต้โหลด
+    surface_nodes = sorted([i for i in all_surf
+                            if (x_left - 1e-10) <= nodes[i, 0] <= (x_right + 1e-10)],
+                           key=lambda i: nodes[i, 0])
 
     # กระจาย load ไปยัง surface nodes (tributary length)
     n_surf = len(surface_nodes)
